@@ -41,6 +41,7 @@ Agent output rules:
 - Output must be one Playwright .ts file, nothing else.
 - Import test and expect from '@playwright/test'.
 - Use role, label, text, test-id, or CSS locators only when stable.
+- Do not use page.locator('text=...'); prefer page.getByRole(...), page.getByText(...), or exact CSS for stable page structure.
 - Do not use XPath, waitForTimeout, test.skip, test.fixme, or test.only.
 - Test must not submit forms or modify application data unless the ticket explicitly asks for it.
 - Prefer page.goto('/') and rely on Playwright baseURL.

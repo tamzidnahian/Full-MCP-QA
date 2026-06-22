@@ -15,6 +15,7 @@ const bannedPatterns: Array<[RegExp, string]> = [
   ],
   [/\btest\s*\.\s*(skip|fixme|only)\s*\(/, "Generated tests must not use test.skip, test.fixme, or test.only."],
   [/waitForTimeout\s*\(/, "Generated tests must not use waitForTimeout."],
+  [/locator\s*\(\s*["']text=/i, "Generated tests must not use the text= selector engine through locator()."],
   [/\bxpath\s*=|locator\s*\(\s*["']xpath=/i, "Generated tests must not use XPath."],
 ];
 
