@@ -80,7 +80,7 @@ jobs:
             state/agent.sqlite
 
       - name: Save QA history
-        if: always()
+        if: always() && hashFiles('state/**') != ''
         uses: actions/cache/save@v4
         with:
           path: state
