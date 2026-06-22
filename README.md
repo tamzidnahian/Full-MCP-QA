@@ -100,7 +100,7 @@ npm run agent:history
 
 ## GitHub Actions CI
 
-The workflow in `.github/workflows/qa-agent.yml` runs every 12 hours and can also be triggered manually from GitHub Actions.
+The workflow in `.github/workflows/qa-agent.yml` runs daily at 7:00 AM and 2:00 PM Pacific time during PDT (`14:00` and `21:00` UTC), and can also be triggered manually from GitHub Actions.
 
 It runs:
 
