@@ -1,0 +1,87 @@
+name: QA Agent
+
+on:
+  schedule:
+    - cron: "0 */12 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  qa-agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      CI: "true"
+      TARGET_URL: ${{ secrets.TARGET_URL }}
+      JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+      JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+      JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+      JIRA_PROJECT_KEY: ${{ secrets.JIRA_PROJECT_KEY }}
+      JIRA_LABEL: ${{ secrets.JIRA_LABEL || 'ai-qa-ready' }}
+      JIRA_TRANSITION_DONE_ID: ${{ secrets.JIRA_TRANSITION_DONE_ID }}
+      JIRA_AUTONOMOUS_FAILURE_LABEL: ${{ secrets.JIRA_AUTONOMOUS_FAILURE_LABEL || 'ai-qa-failed' }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+      SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
+      GITHUB_REPO: tamzidnahian/Full-MCP-QA
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      AGENT_MAX_TICKETS: "5"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Restore QA history
+        uses: actions/cache/restore@v4
+        with:
+          path: state
+          key: qa-history-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: |
+            qa-history-${{ github.ref_name }}-
+            qa-history-
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run existing Playwright tests
+        run: npm test
+
+      - name: Run autonomous Jira QA scan
+        run: npm run agent:auto
+
+      - name: Upload QA artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-agent-artifacts-${{ github.run_id }}
+          if-no-files-found: ignore
+          retention-days: 30
+          path: |
+            playwright-report/
+            test-results/
+            metrics/
+            state/agent.sqlite
+
+      - name: Save QA history
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state
+          key: qa-history-${{ github.ref_name }}-${{ github.run_id }}

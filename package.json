@@ -1,0 +1,31 @@
+{
+  "name": "website-qa-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "agent:check-ticket": "tsx agent/checkTicket.ts",
+    "agent:auto": "tsx agent/auto.ts",
+    "agent:webhook": "tsx agent/webhook.ts",
+    "agent:history": "tsx agent/history.ts",
+    "agent:find-transition": "tsx agent/findJiraTransition.ts",
+    "agent:set-hn-ticket": "tsx agent/setHackerNewsTicket.ts",
+    "agent:start": "tsx agent/run.ts start",
+    "agent:resume": "tsx agent/run.ts resume",
+    "mcp:server": "tsx agent/mcpServer.ts",
+    "typecheck": "tsc",
+    "test": "playwright test"
+  },
+  "dependencies": {
+    "@langchain/langgraph": "^1.4.4",
+    "@langchain/openai": "^1.5.1",
+    "better-sqlite3": "^12.5.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.0",
+    "@types/node": "^26.0.0",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  }
+}
