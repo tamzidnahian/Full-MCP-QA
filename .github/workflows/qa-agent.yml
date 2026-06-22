@@ -6,14 +6,60 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  issues: write
-  pull-requests: write
+  contents: read
 
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+
+    env:
+      CI: "true"
+      TARGET_URL: ${{ secrets.TARGET_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run existing Playwright tests
+        run: npm test
+
+      - name: Upload validation artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-validation-artifacts-${{ github.run_id }}
+          if-no-files-found: ignore
+          retention-days: 30
+          path: |
+            playwright-report/
+            test-results/
+
   qa-agent:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    needs: validate
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
 
     env:
       CI: "true"
@@ -33,6 +79,8 @@ jobs:
       GITHUB_BASE_BRANCH: main
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       AGENT_MAX_TICKETS: "5"
+      AGENT_TRANSITION_ON_PASS: ${{ secrets.AGENT_TRANSITION_ON_PASS || 'false' }}
+      TARGET_TEST_HINTS: ${{ secrets.TARGET_TEST_HINTS }}
 
     steps:
       - name: Checkout
@@ -58,12 +106,6 @@ jobs:
           restore-keys: |
             qa-history-${{ github.ref_name }}-
             qa-history-
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Run existing Playwright tests
-        run: npm test
 
       - name: Run autonomous Jira QA scan
         run: npm run agent:auto

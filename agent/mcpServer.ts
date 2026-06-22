@@ -42,6 +42,18 @@ async function handle(request: JsonRpcRequest) {
   }
 
   if (request.method === "tools/call" && request.params?.name === "qa_agent_status") {
+    const latestRun = latestQaRun();
+    const safeLatestRun = latestRun
+      ? (() => {
+          const { test_code, failure_log, ...rest } = latestRun;
+          return {
+            ...rest,
+            hasTestCode: Boolean(test_code),
+            failureLogPreview: failure_log ? String(failure_log).slice(0, 200) : "",
+          };
+        })()
+      : null;
+
     send(request.id, {
       content: [
         {
@@ -64,7 +76,7 @@ async function handle(request: JsonRpcRequest) {
                   (isRealValue(process.env.GITHUB_TOKEN) || isRealValue(process.env.GITHUB_PERSONAL_ACCESS_TOKEN)),
               ),
               jiraTransitionConfigured: isRealValue(process.env.JIRA_TRANSITION_DONE_ID),
-              latestRun: latestQaRun() ?? null,
+              latestRun: safeLatestRun,
             },
             null,
             2,

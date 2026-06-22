@@ -1,5 +1,6 @@
 import { loadEnv } from "./env";
 import { isRealValue } from "./config";
+import { redact } from "./redact";
 
 loadEnv();
 
@@ -59,7 +60,7 @@ async function githubFetch(path: string, init: RequestInit = {}) {
 
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`GitHub ${response.status}: ${body}`);
+    throw new Error(`GitHub ${response.status}: ${redact(body, 1000)}`);
   }
 
   return response;
@@ -80,7 +81,7 @@ export async function createGitHubIssue(input: GitHubIssueInput) {
 
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`GitHub ${response.status}: ${body}`);
+    throw new Error(`GitHub ${response.status}: ${redact(body, 1000)}`);
   }
 
   const issue = await response.json();
@@ -154,7 +155,8 @@ export async function createGeneratedTestPullRequest(input: PullRequestInput) {
   if (!isRealValue(repo) || !isRealValue(token)) return undefined;
 
   const baseBranch = githubBaseBranch();
-  const branch = `ai-qa/${input.ticketKey}`;
+  const safeTicketKey = input.ticketKey.replace(/[^A-Za-z0-9._-]/g, "-").slice(0, 80);
+  const branch = `ai-qa/${safeTicketKey}`;
   await ensureBranch(branch, baseBranch);
   await upsertFile(input.testPath, branch, input.code, `Add AI QA test for ${input.ticketKey}`);
 

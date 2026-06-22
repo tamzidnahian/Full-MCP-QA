@@ -1,4 +1,5 @@
 import { loadEnv } from "./env";
+import { redact } from "./redact";
 
 loadEnv();
 
@@ -28,7 +29,7 @@ export async function notifySlack(text: string) {
 
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`Slack ${response.status}: ${body}`);
+    throw new Error(`Slack ${response.status}: ${redact(body, 1000)}`);
   }
 
   if (!webhookUrl) {

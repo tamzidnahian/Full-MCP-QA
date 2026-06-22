@@ -1,6 +1,7 @@
 import { createGeneratedTestPullRequest, createGitHubIssue } from "./githubClient";
 import { transitionTicket } from "./jiraClient";
 import { notifySlack } from "./slackClient";
+import { redact } from "./redact";
 
 export type QaResult = {
   ticketKey: string;
@@ -13,7 +14,7 @@ export type QaResult = {
 
 export async function publishResult(result: QaResult) {
   const status = result.passed ? "PASSED" : "FAILED";
-  const shortFailure = result.failureLog ? `\nFailure: ${result.failureLog.slice(0, 500)}` : "";
+  const shortFailure = result.failureLog ? `\nFailure: ${redact(result.failureLog, 500)}` : "";
   const warnings: string[] = [];
   const message =
     `AI-QA ${status} for ${result.ticketKey}\n` + `Test: ${result.testPath}` + shortFailure;
@@ -28,7 +29,7 @@ export async function publishResult(result: QaResult) {
         labels: ["ai-qa", "bug"],
       });
     } catch (error: any) {
-      warnings.push(`GitHub issue creation failed: ${String(error?.message ?? error).slice(0, 300)}`);
+      warnings.push(`GitHub issue creation failed: ${redact(error?.message ?? error, 300)}`);
     }
   }
 
@@ -41,7 +42,7 @@ export async function publishResult(result: QaResult) {
         code: result.testCode,
       });
     } catch (error: any) {
-      warnings.push(`GitHub pull request creation failed: ${String(error?.message ?? error).slice(0, 300)}`);
+      warnings.push(`GitHub pull request creation failed: ${redact(error?.message ?? error, 300)}`);
     }
   }
 
@@ -53,14 +54,14 @@ export async function publishResult(result: QaResult) {
         : "";
     await notifySlack(`${message}${githubLink}`);
   } catch (error: any) {
-    warnings.push(`Slack notification failed: ${String(error?.message ?? error).slice(0, 300)}`);
+    warnings.push(`Slack notification failed: ${redact(error?.message ?? error, 300)}`);
   }
 
-  if (result.passed && process.env.JIRA_TRANSITION_DONE_ID) {
+  if (result.passed && process.env.AGENT_TRANSITION_ON_PASS === "true" && process.env.JIRA_TRANSITION_DONE_ID) {
     try {
       await transitionTicket(result.ticketKey, process.env.JIRA_TRANSITION_DONE_ID);
     } catch (error: any) {
-      warnings.push(`Jira transition failed: ${String(error?.message ?? error).slice(0, 300)}`);
+      warnings.push(`Jira transition failed: ${redact(error?.message ?? error, 300)}`);
     }
   }
 

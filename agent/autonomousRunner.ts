@@ -1,5 +1,7 @@
 import { addLabel, commentOnTicket, findReadyTickets, getTicket, removeLabel } from "./jiraClient";
 import { generateTest, publishGuardFailure, runAndPublishTest, RunMode, Ticket } from "./qaWorkflow";
+import { acquireJobLock, releaseJobLock } from "./historyStore";
+import { redact } from "./redact";
 
 export type AutoResult = {
   ticketKey: string;
@@ -13,35 +15,45 @@ export async function markFailed(ticketKey: string, reason: string) {
   await addLabel(ticketKey, failureLabel());
   await commentOnTicket(
     ticketKey,
-    `AI-QA autonomous runner stopped this ticket and added label ${failureLabel()}. Reason: ${reason}`,
+    `AI-QA autonomous runner stopped this ticket and added label ${failureLabel()}. Reason: ${redact(reason, 500)}`,
   );
 }
 
 export async function processTicket(ticketKey: string, mode: RunMode = "auto"): Promise<AutoResult> {
-  const ticket = await getTicket(ticketKey);
-  console.log(`Auto-QA: processing ${ticket.key} (${ticket.summary})`);
-
-  const generated = await generateTest(ticket);
-  if (!generated.ok) {
-    await publishGuardFailure(ticket, generated.reason, mode);
-    await markFailed(ticket.key, `guard failed: ${generated.reason}`);
-    return { ticketKey: ticket.key, passed: false, reason: generated.reason };
-  }
-
-  const result = await runAndPublishTest(ticket, generated.code, mode);
-  if (!result.passed) {
-    await markFailed(ticket.key, "generated Playwright test failed");
-    console.error(`Auto-QA: ${ticket.key} Playwright failed: ${result.failureLog.slice(0, 500)}`);
-    return { ticketKey: ticket.key, passed: false, reason: result.failureLog };
+  if (!acquireJobLock(ticketKey, mode)) {
+    console.log(`Auto-QA: skipping ${ticketKey}; another run already holds the lock.`);
+    return { ticketKey, passed: false, reason: "ticket already running" };
   }
 
   try {
-    await removeLabel(ticket.key, failureLabel());
-  } catch (error: any) {
-    console.warn(`Auto-QA: could not clear ${failureLabel()} from ${ticket.key}: ${String(error?.message ?? error)}`);
-  }
+    const ticket = await getTicket(ticketKey);
+    console.log(JSON.stringify({ event: "qa_ticket_started", ticketKey: ticket.key, mode, summary: ticket.summary }));
 
-  return { ticketKey: ticket.key, passed: true };
+    const generated = await generateTest(ticket);
+    if (!generated.ok) {
+      await publishGuardFailure(ticket, generated.reason, mode);
+      await markFailed(ticket.key, `guard failed: ${generated.reason}`);
+      return { ticketKey: ticket.key, passed: false, reason: generated.reason };
+    }
+
+    const result = await runAndPublishTest(ticket, generated.code, mode);
+    if (!result.passed) {
+      await markFailed(ticket.key, "generated Playwright test failed");
+      console.error(`Auto-QA: ${ticket.key} Playwright failed: ${redact(result.failureLog, 500)}`);
+      return { ticketKey: ticket.key, passed: false, reason: result.failureLog };
+    }
+
+    try {
+      await removeLabel(ticket.key, failureLabel());
+    } catch (error: any) {
+      console.warn(`Auto-QA: could not clear ${failureLabel()} from ${ticket.key}: ${redact(error?.message ?? error, 500)}`);
+    }
+
+    console.log(JSON.stringify({ event: "qa_ticket_completed", ticketKey: ticket.key, mode, passed: true }));
+    return { ticketKey: ticket.key, passed: true };
+  } finally {
+    releaseJobLock(ticketKey);
+  }
 }
 
 export async function processTickets(tickets: Ticket[], mode: RunMode = "auto") {

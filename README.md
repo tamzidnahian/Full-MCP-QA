@@ -52,13 +52,22 @@ Start the Jira webhook listener:
 npm run agent:webhook
 ```
 
-Jira Automation should send a `POST` request to `/jira/webhook?secret=...` with this JSON body:
+Production webhook requests should send a `POST` request to `/jira/webhook` with this JSON body:
 
 ```json
 {
   "issueKey": "{{issue.key}}"
 }
 ```
+
+Use these headers:
+
+```text
+X-QA-Agent-Timestamp: <unix epoch milliseconds>
+X-QA-Agent-Signature: sha256=<HMAC_SHA256(JIRA_WEBHOOK_SECRET, timestamp + "." + raw_body)>
+```
+
+If you connect directly from Jira Automation and cannot compute an HMAC signature, set `AGENT_WEBHOOK_ALLOW_SHARED_SECRET=true` and send `X-QA-Agent-Secret: <JIRA_WEBHOOK_SECRET>`. Do not put the secret in the URL.
 
 Find and save a Done-like Jira transition id:
 
@@ -67,26 +76,11 @@ npm run agent:find-transition
 npm run agent:find-transition -- ISSUE-KEY
 ```
 
-Generate a test and pause for manual approval:
-
-```powershell
-npm run agent:start -- ISSUE-KEY
-```
-
-Approve or reject:
-
-```powershell
-npm run agent:resume -- ISSUE-KEY approve
-npm run agent:resume -- ISSUE-KEY reject
-```
-
-Generated tests are written to `tests/generated/` only after approval.
-
 Autonomous mode looks for Jira issues matching `JIRA_LABEL`, skips issues already labeled with `JIRA_AUTONOMOUS_FAILURE_LABEL`, and requires no approval prompt. It still guard-checks generated code before writing or running it. Failed or unsafe tickets are labeled with `JIRA_AUTONOMOUS_FAILURE_LABEL` so the watcher does not retry the same failing ticket forever.
 
 Webhook mode uses the same autonomous flow as `agent:auto -- --issue ISSUE-KEY`. Duplicate webhooks for the same currently running issue are accepted but skipped.
 
-On approval, the agent now:
+On an autonomous run, the agent now:
 
 - runs the generated Playwright test
 - writes run history to SQLite and `metrics/ledger.jsonl`
@@ -94,9 +88,9 @@ On approval, the agent now:
 - sends a Slack message when `SLACK_WEBHOOK_URL` is set, or when `SLACK_BOT_TOKEN` and `SLACK_CHANNEL_ID` are set
 - creates a GitHub issue for failed tests when `GITHUB_REPO` and either `GITHUB_TOKEN` or `GITHUB_PERSONAL_ACCESS_TOKEN` are set
 - creates or updates a branch like `ai-qa/SCRUM-4`, commits the generated passing test, opens/reuses a PR, and links it back to Jira
-- transitions passed Jira tickets when `JIRA_TRANSITION_DONE_ID` is set
+- transitions passed Jira tickets only when `AGENT_TRANSITION_ON_PASS=true` and `JIRA_TRANSITION_DONE_ID` are set
 
-Blank optional integration values are skipped, so local test generation still works while Slack, GitHub, or Jira transition credentials are being added. Public comments and notifications do not include model token usage.
+Generated Playwright runs use a scrubbed environment so Jira, Slack, GitHub, and OpenAI secrets are not exposed to generated test code. Blank optional integration values are skipped, so local test generation still works while Slack, GitHub, or Jira transition credentials are being added. Public comments and notifications do not include model token usage.
 
 Check stored run history:
 
@@ -114,6 +108,8 @@ It runs:
 - `npm test`
 - `npm run agent:auto`
 
+The workflow is split into a read-only validation job and a write-enabled autonomous publishing job. The generated Playwright test process still receives only a scrubbed environment.
+
 Configure these repository secrets before enabling scheduled runs:
 
 ```text
@@ -125,6 +121,8 @@ JIRA_PROJECT_KEY
 JIRA_LABEL
 JIRA_TRANSITION_DONE_ID
 JIRA_AUTONOMOUS_FAILURE_LABEL
+AGENT_TRANSITION_ON_PASS
+TARGET_TEST_HINTS
 OPENAI_API_KEY
 SLACK_WEBHOOK_URL
 SLACK_BOT_TOKEN
@@ -141,9 +139,9 @@ Run the local MCP server:
 npm run mcp:server
 ```
 
-It exposes `qa_agent_status`, which reports configured integrations and the latest QA metric.
+It exposes `qa_agent_status`, which reports configured integrations and a redacted latest QA metric.
 
-## First Target
+## Example Target
 
 Default target:
 

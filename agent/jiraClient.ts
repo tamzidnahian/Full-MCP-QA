@@ -1,5 +1,6 @@
 import { loadEnv, requiredEnv } from "./env";
 import { isRealValue } from "./config";
+import { redact } from "./redact";
 
 loadEnv();
 
@@ -24,7 +25,7 @@ async function jiraFetch(path: string, init: RequestInit = {}) {
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`Jira ${response.status}: ${text}`);
+    throw new Error(`Jira ${response.status}: ${redact(text, 1000)}`);
   }
 
   return response;

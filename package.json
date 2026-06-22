@@ -9,9 +9,6 @@
     "agent:webhook": "tsx agent/webhook.ts",
     "agent:history": "tsx agent/history.ts",
     "agent:find-transition": "tsx agent/findJiraTransition.ts",
-    "agent:set-hn-ticket": "tsx agent/setHackerNewsTicket.ts",
-    "agent:start": "tsx agent/run.ts start",
-    "agent:resume": "tsx agent/run.ts resume",
     "mcp:server": "tsx agent/mcpServer.ts",
     "typecheck": "tsc",
     "test": "playwright test"

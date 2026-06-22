@@ -1,5 +1,6 @@
 import { mkdirSync } from "fs";
 import { requiredEnv } from "./env";
+import { redact } from "./redact";
 
 const Database = require("better-sqlite3");
 
@@ -50,6 +51,15 @@ function db() {
   if (!columns.some((column) => column.name === "github_pull_request_url")) {
     database.prepare("ALTER TABLE qa_runs ADD COLUMN github_pull_request_url TEXT").run();
   }
+  database
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS job_locks (
+        ticket_key TEXT PRIMARY KEY,
+        mode TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      )`,
+    )
+    .run();
   return database;
 }
 
@@ -66,9 +76,9 @@ export function saveQaRun(record: QaRunRecord) {
       record.summary,
       record.targetUrl ?? requiredEnv("TARGET_URL"),
       record.testPath ?? "",
-      record.testCode ?? "",
+      redact(record.testCode ?? ""),
       record.status,
-      record.failureLog ?? "",
+      redact(record.failureLog ?? ""),
       record.githubIssueUrl ?? "",
       record.githubPullRequestUrl ?? "",
       record.jiraStatusBefore ?? "",
@@ -77,6 +87,26 @@ export function saveQaRun(record: QaRunRecord) {
       record.startedAt,
       record.endedAt,
     );
+}
+
+export function acquireJobLock(ticketKey: string, mode: string, ttlMs = 30 * 60 * 1000) {
+  const database = db();
+  const now = Date.now();
+  database.prepare("DELETE FROM job_locks WHERE created_at < ?").run(now - ttlMs);
+
+  try {
+    database
+      .prepare("INSERT INTO job_locks (ticket_key, mode, created_at) VALUES (?, ?, ?)")
+      .run(ticketKey, mode, now);
+    return true;
+  } catch (error: any) {
+    if (String(error?.code ?? "").includes("SQLITE_CONSTRAINT")) return false;
+    throw error;
+  }
+}
+
+export function releaseJobLock(ticketKey: string) {
+  db().prepare("DELETE FROM job_locks WHERE ticket_key = ?").run(ticketKey);
 }
 
 export function latestQaRun() {
