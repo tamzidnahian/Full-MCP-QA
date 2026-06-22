@@ -93,6 +93,7 @@ On approval, the agent now:
 - comments the result back to Jira
 - sends a Slack message when `SLACK_WEBHOOK_URL` is set, or when `SLACK_BOT_TOKEN` and `SLACK_CHANNEL_ID` are set
 - creates a GitHub issue for failed tests when `GITHUB_REPO` and either `GITHUB_TOKEN` or `GITHUB_PERSONAL_ACCESS_TOKEN` are set
+- creates or updates a branch like `ai-qa/SCRUM-4`, commits the generated passing test, opens/reuses a PR, and links it back to Jira
 - transitions passed Jira tickets when `JIRA_TRANSITION_DONE_ID` is set
 
 Blank optional integration values are skipped, so local test generation still works while Slack, GitHub, or Jira transition credentials are being added. Public comments and notifications do not include model token usage.
@@ -130,7 +131,7 @@ SLACK_BOT_TOKEN
 SLACK_CHANNEL_ID
 ```
 
-The workflow uses `GITHUB_REPO=tamzidnahian/Full-MCP-QA` and the built-in GitHub Actions `GITHUB_TOKEN` for failure issue creation. It uploads Playwright reports, test results, metrics, and `state/agent.sqlite` as artifacts, and caches `state/` so future scheduled runs can reuse QA history.
+The workflow uses `GITHUB_REPO=tamzidnahian/Full-MCP-QA` and the built-in GitHub Actions `GITHUB_TOKEN` for failure issue creation plus generated-test PR branches. It uploads Playwright reports, test results, metrics, and `state/agent.sqlite` as artifacts, and caches `state/` so future scheduled runs can reuse QA history.
 
 ## MCP
 

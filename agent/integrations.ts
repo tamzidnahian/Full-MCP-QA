@@ -1,11 +1,13 @@
-import { createGitHubIssue } from "./githubClient";
+import { createGeneratedTestPullRequest, createGitHubIssue } from "./githubClient";
 import { transitionTicket } from "./jiraClient";
 import { notifySlack } from "./slackClient";
 
 export type QaResult = {
   ticketKey: string;
+  summary: string;
   passed: boolean;
   testPath: string;
+  testCode?: string;
   failureLog?: string;
 };
 
@@ -17,6 +19,7 @@ export async function publishResult(result: QaResult) {
     `AI-QA ${status} for ${result.ticketKey}\n` + `Test: ${result.testPath}` + shortFailure;
 
   let githubIssueUrl: string | undefined;
+  let githubPullRequestUrl: string | undefined;
   if (!result.passed) {
     try {
       githubIssueUrl = await createGitHubIssue({
@@ -29,8 +32,26 @@ export async function publishResult(result: QaResult) {
     }
   }
 
+  if (result.passed && result.testCode) {
+    try {
+      githubPullRequestUrl = await createGeneratedTestPullRequest({
+        ticketKey: result.ticketKey,
+        summary: result.summary,
+        testPath: result.testPath,
+        code: result.testCode,
+      });
+    } catch (error: any) {
+      warnings.push(`GitHub pull request creation failed: ${String(error?.message ?? error).slice(0, 300)}`);
+    }
+  }
+
   try {
-    await notifySlack(githubIssueUrl ? `${message}\nGitHub issue: ${githubIssueUrl}` : message);
+    const githubLink = githubIssueUrl
+      ? `\nGitHub issue: ${githubIssueUrl}`
+      : githubPullRequestUrl
+        ? `\nGitHub PR: ${githubPullRequestUrl}`
+        : "";
+    await notifySlack(`${message}${githubLink}`);
   } catch (error: any) {
     warnings.push(`Slack notification failed: ${String(error?.message ?? error).slice(0, 300)}`);
   }
@@ -43,5 +64,5 @@ export async function publishResult(result: QaResult) {
     }
   }
 
-  return { githubIssueUrl, warnings };
+  return { githubIssueUrl, githubPullRequestUrl, warnings };
 }

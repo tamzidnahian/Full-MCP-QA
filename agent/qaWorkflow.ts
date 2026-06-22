@@ -117,6 +117,7 @@ export async function publishGuardFailure(ticket: Ticket, reason: string, mode: 
   const startedAt = Date.now();
   const published = await publishResult({
     ticketKey: ticket.key,
+    summary: ticket.summary,
     passed: false,
     testPath: "not written (guard failed)",
     failureLog: reason,
@@ -139,6 +140,7 @@ export async function publishGuardFailure(ticket: Ticket, reason: string, mode: 
     status: "blocked",
     failureLog: reason,
     githubIssueUrl: published.githubIssueUrl,
+    githubPullRequestUrl: published.githubPullRequestUrl,
     jiraStatusBefore: ticket.status,
     jiraStatusAfter: after?.status,
     triggerSource: mode,
@@ -182,8 +184,10 @@ export async function runAndPublishTest(
 
   const published = await publishResult({
     ticketKey: ticket.key,
+    summary: ticket.summary,
     passed,
     testPath,
+    testCode: code,
     failureLog,
   });
 
@@ -191,7 +195,7 @@ export async function runAndPublishTest(
     ticket.key,
     `AI-QA: ${passed ? "PASSED" : "FAILED"}.${failureLog ? " Failure log: " + failureLog.slice(0, 500) : ""}${
       published.githubIssueUrl ? " GitHub issue: " + published.githubIssueUrl : ""
-    }${
+    }${published.githubPullRequestUrl ? " GitHub PR: " + published.githubPullRequestUrl : ""}${
       published.warnings.length ? " Publish warnings: " + published.warnings.join(" | ") : ""
     }${!passed ? " " + issueImprovementHint(failureLog) : ""}`,
   );
@@ -205,6 +209,7 @@ export async function runAndPublishTest(
     status: passed ? "passed" : "failed",
     failureLog,
     githubIssueUrl: published.githubIssueUrl,
+    githubPullRequestUrl: published.githubPullRequestUrl,
     jiraStatusBefore: ticket.status,
     jiraStatusAfter: after?.status,
     triggerSource: mode,
@@ -217,6 +222,7 @@ export async function runAndPublishTest(
     failureLog,
     testPath,
     githubIssueUrl: published.githubIssueUrl,
+    githubPullRequestUrl: published.githubPullRequestUrl,
     publishWarnings: published.warnings,
   };
 }

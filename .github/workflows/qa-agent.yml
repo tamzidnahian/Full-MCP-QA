@@ -6,8 +6,9 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   issues: write
+  pull-requests: write
 
 jobs:
   qa-agent:
@@ -29,6 +30,7 @@ jobs:
       SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
       SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
       GITHUB_REPO: tamzidnahian/Full-MCP-QA
+      GITHUB_BASE_BRANCH: main
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       AGENT_MAX_TICKETS: "5"
 

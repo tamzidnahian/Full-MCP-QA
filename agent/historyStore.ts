@@ -14,6 +14,7 @@ export type QaRunRecord = {
   status: RunStatus;
   failureLog?: string;
   githubIssueUrl?: string;
+  githubPullRequestUrl?: string;
   jiraStatusBefore?: string;
   jiraStatusAfter?: string;
   triggerSource: string;
@@ -36,6 +37,7 @@ function db() {
         status TEXT NOT NULL,
         failure_log TEXT,
         github_issue_url TEXT,
+        github_pull_request_url TEXT,
         jira_status_before TEXT,
         jira_status_after TEXT,
         trigger_source TEXT NOT NULL,
@@ -44,6 +46,10 @@ function db() {
       )`,
     )
     .run();
+  const columns = database.prepare("PRAGMA table_info(qa_runs)").all() as Array<{ name: string }>;
+  if (!columns.some((column) => column.name === "github_pull_request_url")) {
+    database.prepare("ALTER TABLE qa_runs ADD COLUMN github_pull_request_url TEXT").run();
+  }
   return database;
 }
 
@@ -52,8 +58,8 @@ export function saveQaRun(record: QaRunRecord) {
     .prepare(
       `INSERT INTO qa_runs (
         ticket_key, summary, target_url, test_path, test_code, status, failure_log,
-        github_issue_url, jira_status_before, jira_status_after, trigger_source, started_at, ended_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        github_issue_url, github_pull_request_url, jira_status_before, jira_status_after, trigger_source, started_at, ended_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       record.ticketKey,
@@ -64,6 +70,7 @@ export function saveQaRun(record: QaRunRecord) {
       record.status,
       record.failureLog ?? "",
       record.githubIssueUrl ?? "",
+      record.githubPullRequestUrl ?? "",
       record.jiraStatusBefore ?? "",
       record.jiraStatusAfter ?? "",
       record.triggerSource,
