@@ -1,8 +1,15 @@
 import { chromium } from "@playwright/test";
 import { callMcpOperation } from "./mcpClient";
 import { redact } from "./redact";
+import { withSpan } from "./telemetry";
 
 export async function inspectTarget(targetUrl: string, linkLimit = 100) {
+  return withSpan("qa.target.inspect", { "target.origin": new URL(targetUrl).origin }, async () =>
+    inspectTargetInner(targetUrl, linkLimit),
+  );
+}
+
+async function inspectTargetInner(targetUrl: string, linkLimit = 100) {
   if (process.env.PLAYWRIGHT_MCP_ENABLED === "true") {
     try {
       await callMcpOperation("playwright.navigate", { url: targetUrl });

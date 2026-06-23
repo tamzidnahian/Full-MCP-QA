@@ -4,6 +4,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { getOperation, loadMcpConfig, type McpConfig, type McpServerConfig } from "./config";
 import { recordMcpAudit } from "../historyStore";
 import { redact } from "../redact";
+import { withSpan } from "../telemetry";
 
 type ClientEntry = {
   client: Client;
@@ -50,36 +51,42 @@ export class McpGateway {
     input: Record<string, unknown> = {},
     operationName = `${serverName}.${toolName}`,
   ): Promise<T> {
-    const startedAt = Date.now();
-    try {
-      const entry = await this.clientFor(serverName);
-      const raw = await entry.client.callTool({ name: toolName, arguments: input });
-      const output = parseMcpOutput(raw);
+    return withSpan(
+      "mcp.call",
+      { "mcp.server": serverName, "mcp.tool": toolName, "mcp.operation": operationName },
+      async () => {
+        const startedAt = Date.now();
+        try {
+          const entry = await this.clientFor(serverName);
+          const raw = await entry.client.callTool({ name: toolName, arguments: input });
+          const output = parseMcpOutput(raw);
 
-      if ((raw as any)?.isError) {
-        throw new Error(typeof output === "string" ? output : JSON.stringify(output));
-      }
+          if ((raw as any)?.isError) {
+            throw new Error(typeof output === "string" ? output : JSON.stringify(output));
+          }
 
-      await recordMcpAudit({
-        server: serverName,
-        tool: toolName,
-        input,
-        output,
-        ok: true,
-        durationMs: Date.now() - startedAt,
-      });
-      return output as T;
-    } catch (error) {
-      await recordMcpAudit({
-        server: serverName,
-        tool: toolName,
-        input,
-        ok: false,
-        error: `${operationName}: ${errorMessage(error)}`,
-        durationMs: Date.now() - startedAt,
-      });
-      throw error;
-    }
+          await recordMcpAudit({
+            server: serverName,
+            tool: toolName,
+            input,
+            output,
+            ok: true,
+            durationMs: Date.now() - startedAt,
+          });
+          return output as T;
+        } catch (error) {
+          await recordMcpAudit({
+            server: serverName,
+            tool: toolName,
+            input,
+            ok: false,
+            error: `${operationName}: ${errorMessage(error)}`,
+            durationMs: Date.now() - startedAt,
+          });
+          throw error;
+        }
+      },
+    );
   }
 
   async close() {

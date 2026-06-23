@@ -92,6 +92,19 @@ On an autonomous run, the agent now:
 
 Generated Playwright runs use a scrubbed environment so Jira, Slack, GitHub, and OpenAI secrets are not exposed to generated test code. Blank optional integration values are skipped, so local test generation still works while Slack, GitHub, or Jira transition credentials are being added. Public comments and notifications do not include model token counts.
 
+The AI generation path is a LangGraph state machine: inspect target, load lessons, plan, generate, validate, repair once when needed, then return either safe test code or a blocked reason. LangChain remains the model adapter inside those graph nodes.
+
+For production isolation, set `AGENT_TEST_RUNNER=docker` to run generated Playwright tests in a Playwright container. Local development defaults to `AGENT_TEST_RUNNER=process`, which still runs with a scrubbed environment and static guard checks against external navigation.
+
+OpenTelemetry is disabled by default. Enable local console traces with:
+
+```env
+OTEL_ENABLED=true
+OTEL_TRACES_EXPORTER=console
+```
+
+For an observability backend, set `OTEL_TRACES_EXPORTER=otlp` and `OTEL_EXPORTER_OTLP_ENDPOINT`.
+
 Check stored run history:
 
 ```powershell

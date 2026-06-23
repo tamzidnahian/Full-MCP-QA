@@ -2,6 +2,7 @@ import { createGeneratedTestPullRequest, createGitHubIssue } from "./githubOps";
 import { transitionTicket } from "./jiraOps";
 import { notifySlack } from "./slackOps";
 import { redact } from "./redact";
+import { withSpan } from "./telemetry";
 
 export type QaResult = {
   ticketKey: string;
@@ -13,6 +14,14 @@ export type QaResult = {
 };
 
 export async function publishResult(result: QaResult) {
+  return withSpan(
+    "qa.publish.result",
+    { "ticket.key": result.ticketKey, "qa.status": result.passed ? "passed" : "failed", "test.path": result.testPath },
+    async () => publishResultInner(result),
+  );
+}
+
+async function publishResultInner(result: QaResult) {
   const status = result.passed ? "PASSED" : "FAILED";
   const shortFailure = result.failureLog ? `\nFailure: ${redact(result.failureLog, 500)}` : "";
   const warnings: string[] = [];

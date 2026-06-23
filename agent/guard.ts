@@ -78,7 +78,16 @@ function isShortCommonLabel(value: string | undefined) {
   return Boolean(value && value.length <= 3);
 }
 
-function validateAst(code: string): GuardResult {
+function isDisallowedExternalUrl(value: string | undefined, targetUrl?: string) {
+  if (!value || !/^https?:\/\//i.test(value) || !targetUrl) return false;
+  try {
+    return new URL(value).origin !== new URL(targetUrl).origin;
+  } catch {
+    return true;
+  }
+}
+
+function validateAst(code: string, targetUrl?: string): GuardResult {
   const source = ts.createSourceFile("generated.spec.ts", code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   const diagnostics = (source as ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics ?? [];
   if (diagnostics.length > 0) {
@@ -131,6 +140,10 @@ function validateAst(code: string): GuardResult {
         fail("Generated tests must not use unscoped short role locators; use a stable CSS/href selector or a unique accessible label.");
         return;
       }
+      if (method === "goto" && isDisallowedExternalUrl(stringArg(node.arguments[0]), targetUrl)) {
+        fail("Generated tests must not navigate to external origins outside TARGET_URL.");
+        return;
+      }
     }
 
     if (ts.isElementAccessExpression(node)) {
@@ -145,7 +158,7 @@ function validateAst(code: string): GuardResult {
   return failure ?? { ok: true };
 }
 
-export function validate(code: string): GuardResult {
+export function validate(code: string, options: { targetUrl?: string } = {}): GuardResult {
   const trimmed = code.trim();
 
   if (!trimmed) return { ok: false, reason: "Output is empty." };
@@ -162,5 +175,5 @@ export function validate(code: string): GuardResult {
     if (pattern.test(trimmed)) return { ok: false, reason };
   }
 
-  return validateAst(trimmed);
+  return validateAst(trimmed, options.targetUrl);
 }

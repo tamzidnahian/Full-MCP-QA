@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { URL } from "url";
 import { loadEnv, requiredEnv } from "./env";
 import { processTicket } from "./autonomousRunner";
+import { withSpan } from "./telemetry";
 
 loadEnv();
 
@@ -104,7 +105,7 @@ const server = createServer(async (request, response) => {
     }
 
     running.add(issueKey);
-    processTicket(issueKey, "webhook")
+    withSpan("qa.webhook.process", { "ticket.key": issueKey, "trigger.source": "webhook" }, () => processTicket(issueKey, "webhook"))
       .then((result) => {
         console.log(`Webhook QA complete for ${issueKey}. Passed: ${result.passed}`);
       })

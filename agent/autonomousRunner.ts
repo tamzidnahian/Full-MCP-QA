@@ -2,6 +2,7 @@ import { addLabel, commentOnTicket, findReadyTickets, getTicket, removeLabel } f
 import { generateTest, publishGuardFailure, runAndPublishTest, RunMode, Ticket } from "./qaWorkflow";
 import { acquireJobLock, releaseJobLock } from "./historyStore";
 import { redact } from "./redact";
+import { withSpan } from "./telemetry";
 
 export type AutoResult = {
   ticketKey: string;
@@ -20,40 +21,42 @@ export async function markFailed(ticketKey: string, reason: string) {
 }
 
 export async function processTicket(ticketKey: string, mode: RunMode = "auto"): Promise<AutoResult> {
-  if (!acquireJobLock(ticketKey, mode)) {
-    console.log(`Auto-QA: skipping ${ticketKey}; another run already holds the lock.`);
-    return { ticketKey, passed: false, reason: "ticket already running" };
-  }
-
-  try {
-    const ticket = await getTicket(ticketKey);
-    console.log(JSON.stringify({ event: "qa_ticket_started", ticketKey: ticket.key, mode, summary: ticket.summary }));
-
-    const generated = await generateTest(ticket);
-    if (!generated.ok) {
-      await publishGuardFailure(ticket, generated.reason, mode);
-      await markFailed(ticket.key, `guard failed: ${generated.reason}`);
-      return { ticketKey: ticket.key, passed: false, reason: generated.reason };
-    }
-
-    const result = await runAndPublishTest(ticket, generated.code, mode);
-    if (!result.passed) {
-      await markFailed(ticket.key, "generated Playwright test failed");
-      console.error(`Auto-QA: ${ticket.key} Playwright failed: ${redact(result.failureLog, 500)}`);
-      return { ticketKey: ticket.key, passed: false, reason: result.failureLog };
+  return withSpan("qa.ticket.process", { "ticket.key": ticketKey, "trigger.source": mode }, async () => {
+    if (!acquireJobLock(ticketKey, mode)) {
+      console.log(`Auto-QA: skipping ${ticketKey}; another run already holds the lock.`);
+      return { ticketKey, passed: false, reason: "ticket already running" };
     }
 
     try {
-      await removeLabel(ticket.key, failureLabel());
-    } catch (error: any) {
-      console.warn(`Auto-QA: could not clear ${failureLabel()} from ${ticket.key}: ${redact(error?.message ?? error, 500)}`);
-    }
+      const ticket = await getTicket(ticketKey);
+      console.log(JSON.stringify({ event: "qa_ticket_started", ticketKey: ticket.key, mode, summary: ticket.summary }));
 
-    console.log(JSON.stringify({ event: "qa_ticket_completed", ticketKey: ticket.key, mode, passed: true }));
-    return { ticketKey: ticket.key, passed: true };
-  } finally {
-    releaseJobLock(ticketKey);
-  }
+      const generated = await generateTest(ticket);
+      if (!generated.ok) {
+        await publishGuardFailure(ticket, generated.reason, mode);
+        await markFailed(ticket.key, `guard failed: ${generated.reason}`);
+        return { ticketKey: ticket.key, passed: false, reason: generated.reason };
+      }
+
+      const result = await runAndPublishTest(ticket, generated.code, mode);
+      if (!result.passed) {
+        await markFailed(ticket.key, "generated Playwright test failed");
+        console.error(`Auto-QA: ${ticket.key} Playwright failed: ${redact(result.failureLog, 500)}`);
+        return { ticketKey: ticket.key, passed: false, reason: result.failureLog };
+      }
+
+      try {
+        await removeLabel(ticket.key, failureLabel());
+      } catch (error: any) {
+        console.warn(`Auto-QA: could not clear ${failureLabel()} from ${ticket.key}: ${redact(error?.message ?? error, 500)}`);
+      }
+
+      console.log(JSON.stringify({ event: "qa_ticket_completed", ticketKey: ticket.key, mode, passed: true }));
+      return { ticketKey: ticket.key, passed: true };
+    } finally {
+      releaseJobLock(ticketKey);
+    }
+  });
 }
 
 export async function processTickets(tickets: Ticket[], mode: RunMode = "auto") {
@@ -72,11 +75,13 @@ export async function processTickets(tickets: Ticket[], mode: RunMode = "auto") 
 }
 
 export async function processReadyTickets(maxTickets: number, mode: RunMode = "auto") {
-  const tickets = await findReadyTickets(maxTickets);
-  if (tickets.length === 0) {
-    console.log("Auto-QA: no ready Jira tickets found.");
-    return [];
-  }
+  return withSpan("qa.jira.scan", { "trigger.source": mode }, async () => {
+    const tickets = await findReadyTickets(maxTickets);
+    if (tickets.length === 0) {
+      console.log("Auto-QA: no ready Jira tickets found.");
+      return [];
+    }
 
-  return processTickets(tickets, mode);
+    return processTickets(tickets, mode);
+  });
 }

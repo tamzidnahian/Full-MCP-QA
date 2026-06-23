@@ -14,9 +14,3 @@ export const codeModel = new ChatOpenAI({
   temperature: 0,
   maxTokens: 600,
 });
-
-export const analysisModel = new ChatOpenAI({
-  model: "gpt-4o-mini",
-  temperature: 0,
-  maxTokens: 250,
-});
