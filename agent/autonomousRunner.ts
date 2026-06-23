@@ -1,4 +1,4 @@
-import { addLabel, commentOnTicket, findReadyTickets, getTicket, removeLabel } from "./jiraClient";
+import { addLabel, commentOnTicket, findReadyTickets, getTicket, removeLabel } from "./jiraOps";
 import { generateTest, publishGuardFailure, runAndPublishTest, RunMode, Ticket } from "./qaWorkflow";
 import { acquireJobLock, releaseJobLock } from "./historyStore";
 import { redact } from "./redact";

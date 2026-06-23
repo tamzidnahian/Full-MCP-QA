@@ -1,4 +1,5 @@
-import { getTicket } from "./jiraClient";
+import { getTicket } from "./jiraOps";
+import { closeMcpGateway } from "./mcpClient";
 
 const [ticketKey] = process.argv.slice(2);
 
@@ -36,7 +37,12 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+main()
+  .then(async () => {
+    await closeMcpGateway();
+  })
+  .catch(async (error) => {
+    await closeMcpGateway();
+    console.error(error);
+    process.exit(1);
+  });

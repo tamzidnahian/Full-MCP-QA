@@ -1,6 +1,20 @@
 import { chromium } from "@playwright/test";
+import { callMcpOperation } from "./mcpClient";
+import { redact } from "./redact";
 
 export async function inspectTarget(targetUrl: string, linkLimit = 100) {
+  if (process.env.PLAYWRIGHT_MCP_ENABLED === "true") {
+    try {
+      await callMcpOperation("playwright.navigate", { url: targetUrl });
+      const snapshot = await callMcpOperation("playwright.snapshot", {});
+      await callMcpOperation("playwright.close", {}).catch(() => undefined);
+      return typeof snapshot === "string" ? snapshot : JSON.stringify(snapshot, null, 2);
+    } catch (error: any) {
+      await callMcpOperation("playwright.close", {}).catch(() => undefined);
+      console.warn(`Playwright MCP inspection failed; falling back to local browser: ${redact(error?.message ?? error, 500)}`);
+    }
+  }
+
   const browser = await chromium.launch();
   const page = await browser.newPage();
   await page.goto(targetUrl);

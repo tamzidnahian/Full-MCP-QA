@@ -56,6 +56,28 @@ const bannedMethods = new Set([
   "uncheck",
 ]);
 
+function stringArg(argument: ts.Expression | undefined) {
+  return argument && ts.isStringLiteralLike(argument) ? argument.text.trim() : undefined;
+}
+
+function optionString(call: ts.CallExpression, optionName: string) {
+  const options = call.arguments[1];
+  if (!options || !ts.isObjectLiteralExpression(options)) return undefined;
+
+  for (const property of options.properties) {
+    if (!ts.isPropertyAssignment(property)) continue;
+    const name = property.name;
+    const key = ts.isIdentifier(name) || ts.isStringLiteralLike(name) ? name.text : undefined;
+    if (key === optionName && ts.isStringLiteralLike(property.initializer)) return property.initializer.text.trim();
+  }
+
+  return undefined;
+}
+
+function isShortCommonLabel(value: string | undefined) {
+  return Boolean(value && value.length <= 3);
+}
+
 function validateAst(code: string): GuardResult {
   const source = ts.createSourceFile("generated.spec.ts", code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   const diagnostics = (source as ts.SourceFile & { parseDiagnostics?: readonly ts.Diagnostic[] }).parseDiagnostics ?? [];
@@ -97,6 +119,18 @@ function validateAst(code: string): GuardResult {
     if (ts.isPropertyAccessExpression(node) && bannedMethods.has(node.name.text)) {
       fail(`Generated tests must not use ${node.name.text}().`);
       return;
+    }
+
+    if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+      const method = node.expression.name.text;
+      if (method === "getByText" && isShortCommonLabel(stringArg(node.arguments[0]))) {
+        fail("Generated tests must not use unscoped short text locators; use a stable CSS/href selector or a unique accessible label.");
+        return;
+      }
+      if (method === "getByRole" && isShortCommonLabel(optionString(node, "name"))) {
+        fail("Generated tests must not use unscoped short role locators; use a stable CSS/href selector or a unique accessible label.");
+        return;
+      }
     }
 
     if (ts.isElementAccessExpression(node)) {

@@ -1,6 +1,6 @@
-import { createGeneratedTestPullRequest, createGitHubIssue } from "./githubClient";
-import { transitionTicket } from "./jiraClient";
-import { notifySlack } from "./slackClient";
+import { createGeneratedTestPullRequest, createGitHubIssue } from "./githubOps";
+import { transitionTicket } from "./jiraOps";
+import { notifySlack } from "./slackOps";
 import { redact } from "./redact";
 
 export type QaResult = {

@@ -70,6 +70,19 @@ test('uses ambiguous text engine', async ({ page }) => {
   expect(result.ok).toBe(false);
 });
 
+test("guard blocks unscoped short role locators", () => {
+  const result = validate(`
+import { test, expect } from '@playwright/test';
+
+test('uses short ambiguous role label', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('link', { name: 'new' })).toBeVisible();
+});
+`);
+
+  expect(result.ok).toBe(false);
+});
+
 test("redaction removes common secret shapes", () => {
   const output = redact("Bearer abcdefghijklmnopqrstuvwxyz123456 and user@example.com");
 

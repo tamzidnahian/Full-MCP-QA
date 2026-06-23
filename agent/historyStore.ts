@@ -23,6 +23,25 @@ export type QaRunRecord = {
   endedAt: number;
 };
 
+export type McpAuditRecord = {
+  server: string;
+  tool: string;
+  input?: unknown;
+  output?: unknown;
+  ok: boolean;
+  error?: string;
+  durationMs: number;
+  createdAt?: number;
+};
+
+function safeJson(value: unknown) {
+  try {
+    return redact(JSON.stringify(value ?? {}));
+  } catch {
+    return redact(String(value ?? ""));
+  }
+}
+
 function db() {
   mkdirSync("state", { recursive: true });
   const database = new Database("state/agent.sqlite");
@@ -56,6 +75,21 @@ function db() {
       `CREATE TABLE IF NOT EXISTS job_locks (
         ticket_key TEXT PRIMARY KEY,
         mode TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      )`,
+    )
+    .run();
+  database
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS mcp_audit (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        server_name TEXT NOT NULL,
+        tool_name TEXT NOT NULL,
+        input_json TEXT NOT NULL,
+        output_json TEXT,
+        ok INTEGER NOT NULL,
+        error TEXT,
+        duration_ms INTEGER NOT NULL,
         created_at INTEGER NOT NULL
       )`,
     )
@@ -107,6 +141,25 @@ export function acquireJobLock(ticketKey: string, mode: string, ttlMs = 30 * 60 
 
 export function releaseJobLock(ticketKey: string) {
   db().prepare("DELETE FROM job_locks WHERE ticket_key = ?").run(ticketKey);
+}
+
+export async function recordMcpAudit(record: McpAuditRecord) {
+  db()
+    .prepare(
+      `INSERT INTO mcp_audit (
+        server_name, tool_name, input_json, output_json, ok, error, duration_ms, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      record.server,
+      record.tool,
+      safeJson(record.input ?? {}),
+      typeof record.output === "undefined" ? null : safeJson(record.output),
+      record.ok ? 1 : 0,
+      record.error ? redact(record.error, 1500) : null,
+      record.durationMs,
+      record.createdAt ?? Date.now(),
+    );
 }
 
 export function latestQaRun() {

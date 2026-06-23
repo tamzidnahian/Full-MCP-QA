@@ -1,6 +1,6 @@
 # Website QA Agent
 
-Standalone Jira-to-Playwright QA agent for testing any website URL, then posting results to Jira, Slack, and GitHub when those integrations are configured.
+Standalone Jira-to-Playwright QA agent for testing any website URL, then posting results to Jira, Slack, and GitHub when those integrations are configured. External integrations run through a local MCP gateway with allowlisted operations and redacted SQLite audit logging.
 
 ## Setup
 
@@ -90,7 +90,7 @@ On an autonomous run, the agent now:
 - creates or updates a branch like `ai-qa/SCRUM-4`, commits the generated passing test, opens/reuses a PR, and links it back to Jira
 - transitions passed Jira tickets only when `AGENT_TRANSITION_ON_PASS=true` and `JIRA_TRANSITION_DONE_ID` are set
 
-Generated Playwright runs use a scrubbed environment so Jira, Slack, GitHub, and OpenAI secrets are not exposed to generated test code. Blank optional integration values are skipped, so local test generation still works while Slack, GitHub, or Jira transition credentials are being added. Public comments and notifications do not include model token usage.
+Generated Playwright runs use a scrubbed environment so Jira, Slack, GitHub, and OpenAI secrets are not exposed to generated test code. Blank optional integration values are skipped, so local test generation still works while Slack, GitHub, or Jira transition credentials are being added. Public comments and notifications do not include model token counts.
 
 Check stored run history:
 
@@ -133,13 +133,39 @@ The workflow uses `GITHUB_REPO=tamzidnahian/Full-MCP-QA` and the built-in GitHub
 
 ## MCP
 
-Run the local MCP server:
+The autonomous workflow uses `mcp.config.json` to route integration calls through allowlisted operation aliases:
+
+- `jira.getIssue`, `jira.findReadyIssues`, `jira.commentIssue`, `jira.addLabel`, `jira.removeLabel`, `jira.transitionIssue`
+- `github.createIssue`, `github.createBranch`, `github.createOrUpdateFile`, `github.findPullRequest`, `github.createPullRequest`
+- `slack.postMessage`
+- optional Playwright MCP inspection through `playwright.navigate`, `playwright.snapshot`, and `playwright.close`
+
+Run the redacted agent status MCP server:
 
 ```powershell
 npm run mcp:server
 ```
 
 It exposes `qa_agent_status`, which reports configured integrations and a redacted latest QA metric.
+
+The local stdio MCP servers used by the gateway can also be started directly for debugging:
+
+```powershell
+npm run mcp:jira
+npm run mcp:github
+npm run mcp:slack
+```
+
+Playwright MCP inspection is optional. To use it, run a Playwright MCP server on `PLAYWRIGHT_MCP_URL` and set:
+
+```env
+PLAYWRIGHT_MCP_ENABLED=true
+PLAYWRIGHT_MCP_URL=http://localhost:8931/mcp
+```
+
+If Playwright MCP is disabled or unavailable, target inspection falls back to the local Playwright browser path. Generated tests still execute through the local Playwright CLI so reports and artifacts continue to work.
+
+Every MCP call is audited in `state/agent.sqlite` table `mcp_audit` with redacted input, output, errors, duration, and timestamp.
 
 ## Example Target
 

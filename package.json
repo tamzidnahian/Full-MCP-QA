@@ -10,12 +10,16 @@
     "agent:history": "tsx agent/history.ts",
     "agent:find-transition": "tsx agent/findJiraTransition.ts",
     "mcp:server": "tsx agent/mcpServer.ts",
+    "mcp:jira": "tsx agent/mcpServers/jira.ts",
+    "mcp:github": "tsx agent/mcpServers/github.ts",
+    "mcp:slack": "tsx agent/mcpServers/slack.ts",
     "typecheck": "tsc",
     "test": "playwright test"
   },
   "dependencies": {
     "@langchain/langgraph": "^1.4.4",
     "@langchain/openai": "^1.5.1",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "better-sqlite3": "^12.5.0",
     "zod": "^4.4.3"
   },

@@ -17,16 +17,28 @@ type PullRequestInput = {
   summary: string;
 };
 
-function githubRepo() {
+export function githubRepo() {
   return process.env.GITHUB_REPO;
 }
 
-function githubToken() {
+export function githubToken() {
   return process.env.GITHUB_TOKEN || process.env.GITHUB_PERSONAL_ACCESS_TOKEN;
 }
 
-function githubBaseBranch() {
+export function githubBaseBranch() {
   return process.env.GITHUB_BASE_BRANCH || "main";
+}
+
+function safeBranchName(branch: string) {
+  const safe = branch
+    .replace(/[^A-Za-z0-9._/-]/g, "-")
+    .replace(/\/+/g, "/")
+    .replace(/^\/+|\/+$/g, "")
+    .replace(/\.\.+/g, ".")
+    .slice(0, 120);
+
+  if (!safe) throw new Error("GitHub branch name is empty after sanitization.");
+  return safe;
 }
 
 function authHeaders(token: string) {
@@ -100,6 +112,8 @@ async function getRefSha(branch: string) {
 }
 
 async function ensureBranch(branch: string, baseBranch: string) {
+  branch = safeBranchName(branch);
+  baseBranch = safeBranchName(baseBranch);
   const existing = await getRefSha(branch).catch(() => undefined);
   if (existing) return existing;
 
@@ -126,6 +140,7 @@ async function existingFileSha(path: string, branch: string) {
 }
 
 async function upsertFile(path: string, branch: string, content: string, message: string) {
+  branch = safeBranchName(branch);
   const sha = await existingFileSha(path, branch);
   await githubFetch(`/contents/${contentPath(path)}`, {
     method: "PUT",
@@ -139,6 +154,8 @@ async function upsertFile(path: string, branch: string, content: string, message
 }
 
 async function existingPullRequest(branch: string, baseBranch: string) {
+  branch = safeBranchName(branch);
+  baseBranch = safeBranchName(baseBranch);
   const owner = await getRepoOwner();
   const response = await githubFetch(
     `/pulls?state=open&head=${encodeURIComponent(`${owner}:${branch}`)}&base=${encodeURIComponent(baseBranch)}`,
@@ -147,6 +164,68 @@ async function existingPullRequest(branch: string, baseBranch: string) {
   const pulls = await response.json();
   const pull = Array.isArray(pulls) ? pulls[0] : undefined;
   return pull?.html_url ? String(pull.html_url) : undefined;
+}
+
+export async function createBranch(branch: string, baseBranch = githubBaseBranch()) {
+  const repo = githubRepo();
+  const token = githubToken();
+  if (!isRealValue(repo) || !isRealValue(token)) return undefined;
+
+  const safeBranch = safeBranchName(branch);
+  const sha = await ensureBranch(safeBranch, baseBranch);
+  return { branch: safeBranch, sha };
+}
+
+export async function createOrUpdateFile(input: { branch: string; path: string; content: string; message: string }) {
+  const repo = githubRepo();
+  const token = githubToken();
+  if (!isRealValue(repo) || !isRealValue(token)) return undefined;
+
+  const branch = safeBranchName(input.branch);
+  await upsertFile(input.path, branch, input.content, input.message);
+  return { branch, path: input.path };
+}
+
+export async function findPullRequest(branch: string, baseBranch = githubBaseBranch()) {
+  const repo = githubRepo();
+  const token = githubToken();
+  if (!isRealValue(repo) || !isRealValue(token)) return undefined;
+
+  const url = await existingPullRequest(branch, baseBranch);
+  return { url };
+}
+
+export async function createPullRequest(input: { title: string; body: string; head: string; base?: string }) {
+  const repo = githubRepo();
+  const token = githubToken();
+  if (!isRealValue(repo) || !isRealValue(token)) return undefined;
+
+  const response = await githubFetch("/pulls", {
+    method: "POST",
+    body: JSON.stringify({
+      title: input.title,
+      head: safeBranchName(input.head),
+      base: safeBranchName(input.base || githubBaseBranch()),
+      body: input.body,
+    }),
+  });
+  if (!response) return undefined;
+  const pull = await response.json();
+  return { url: String(pull.html_url ?? ""), number: pull.number };
+}
+
+export async function addIssueComment(issueNumber: number, body: string) {
+  const repo = githubRepo();
+  const token = githubToken();
+  if (!isRealValue(repo) || !isRealValue(token)) return undefined;
+
+  const response = await githubFetch(`/issues/${issueNumber}/comments`, {
+    method: "POST",
+    body: JSON.stringify({ body }),
+  });
+  if (!response) return undefined;
+  const comment = await response.json();
+  return { url: String(comment.html_url ?? "") };
 }
 
 export async function createGeneratedTestPullRequest(input: PullRequestInput) {

@@ -1,6 +1,7 @@
-import { getTicket } from "./jiraClient";
+import { getTicket } from "./jiraOps";
 import { loadEnv } from "./env";
 import { processReadyTickets, processTickets } from "./autonomousRunner";
+import { closeMcpGateway } from "./mcpClient";
 
 loadEnv();
 
@@ -34,7 +35,12 @@ async function main() {
   } while (watch);
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+main()
+  .then(async () => {
+    await closeMcpGateway();
+  })
+  .catch(async (error) => {
+    await closeMcpGateway();
+    console.error(error);
+    process.exit(1);
+  });

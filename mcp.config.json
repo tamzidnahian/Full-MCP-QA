@@ -1,0 +1,62 @@
+{
+  "permissionMode": "allowlist",
+  "servers": {
+    "jira": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["tsx", "agent/mcpServers/jira.ts"],
+      "allowedTools": [
+        "get_issue",
+        "find_ready_issues",
+        "comment_issue",
+        "update_issue",
+        "add_label",
+        "remove_label",
+        "transition_issue"
+      ]
+    },
+    "github": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["tsx", "agent/mcpServers/github.ts"],
+      "allowedTools": [
+        "create_issue",
+        "create_branch",
+        "create_or_update_file",
+        "find_pull_request",
+        "create_pull_request",
+        "add_issue_comment"
+      ]
+    },
+    "slack": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["tsx", "agent/mcpServers/slack.ts"],
+      "allowedTools": ["post_message"]
+    },
+    "playwright": {
+      "transport": "http",
+      "url": "${PLAYWRIGHT_MCP_URL:-http://localhost:8931/mcp}",
+      "allowedTools": ["browser_navigate", "browser_snapshot", "browser_close"]
+    }
+  },
+  "operations": {
+    "jira.getIssue": { "server": "jira", "tool": "get_issue" },
+    "jira.findReadyIssues": { "server": "jira", "tool": "find_ready_issues" },
+    "jira.commentIssue": { "server": "jira", "tool": "comment_issue" },
+    "jira.updateIssue": { "server": "jira", "tool": "update_issue" },
+    "jira.addLabel": { "server": "jira", "tool": "add_label" },
+    "jira.removeLabel": { "server": "jira", "tool": "remove_label" },
+    "jira.transitionIssue": { "server": "jira", "tool": "transition_issue" },
+    "github.createIssue": { "server": "github", "tool": "create_issue" },
+    "github.createBranch": { "server": "github", "tool": "create_branch" },
+    "github.createOrUpdateFile": { "server": "github", "tool": "create_or_update_file" },
+    "github.findPullRequest": { "server": "github", "tool": "find_pull_request" },
+    "github.createPullRequest": { "server": "github", "tool": "create_pull_request" },
+    "github.addIssueComment": { "server": "github", "tool": "add_issue_comment" },
+    "slack.postMessage": { "server": "slack", "tool": "post_message" },
+    "playwright.navigate": { "server": "playwright", "tool": "browser_navigate" },
+    "playwright.snapshot": { "server": "playwright", "tool": "browser_snapshot" },
+    "playwright.close": { "server": "playwright", "tool": "browser_close" }
+  }
+}
