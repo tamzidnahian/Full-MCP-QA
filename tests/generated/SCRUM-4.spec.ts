@@ -7,14 +7,11 @@ test('Verify the Hacker News homepage loads correctly and exposes stable navigat
   await expect(page).toHaveTitle('Hacker News');
 
   // Verify that the Hacker News header link is visible
-  const headerLink = page.locator('a[href="news"]');
-  await expect(headerLink).toBeVisible();
+  await expect(page.locator('a[href="news"]')).toBeVisible();
 
-  // Verify that the 'new' link is visible
-  const newLink = page.locator('a[href="newest"]');
-  await expect(newLink).toBeVisible();
+  // Verify that the top navigation 'new' link is visible
+  await expect(page.locator('a[href="newest"]')).toBeVisible();
 
   // Verify that at least one story/content link is visible
-  const firstStoryLink = page.locator('.titleline > a').first();
-  await expect(firstStoryLink).toBeVisible();
+  await expect(page.locator('.titleline > a').first()).toBeVisible();
 });
